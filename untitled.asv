@@ -1,0 +1,456 @@
+clear; close all; clc;
+% Initial position and orientation 
+x = 0.5;
+y = 0.5;
+theta = 0;
+% cut grid
+% Matlab C code generator
+% read and plot seriel from micro pico
+% static and live objects use USGS topo 
+rng('shuffle');
+gs = 10;              % map is [0,10] x [0,10]
+margin = 0.2;         % keep goal slightly off exact edges
+tol_goal = 0.002;      % minimum distance from any obstacle polyline (allows "close")
+
+maxtries = 2000;
+placed = false;
+
+    for k = 1:maxtries
+    xg = margin + (gs - 2*margin) * rand;
+    yg = margin + (gs - 2*margin) * rand;
+
+    % Start with large distance; reduce vs each obstacle polyline
+    dmin = inf;
+
+    if exist('obst1_points','var') && ~isempty(obst1_points)
+        % reject if inside a closed polygon (rectangles likely closed)
+        if inpolygon(xg, yg, obst1_points(1,:), obst1_points(2,:)), continue; end
+        dmin = min(dmin, min(hypot(xg - obst1_points(1,:), yg - obst1_points(2,:))));
+    end
+
+    if exist('obst2_points','var') && ~isempty(obst2_points)
+        % obst2 is an open "L": distance-only check
+        dmin = min(dmin, min(hypot(xg - obst2_points(1,:), yg - obst2_points(2,:))));
+    end
+
+    if exist('obst3_points','var') && ~isempty(obst3_points)
+        if inpolygon(xg, yg, obst3_points(1,:), obst3_points(2,:)), continue; end
+        dmin = min(dmin, min(hypot(xg - obst3_points(1,:), yg - obst3_points(2,:))));
+    end
+
+    if exist('border_points','var') && ~isempty(border_points)
+        % Do NOT use inpolygon here (would exclude whole interior). Distance-only.
+        dmin = min(dmin, min(hypot(xg - border_points(1,:), yg - border_points(2,:))));
+    end
+
+
+        x_goal = xg; 
+        y_goal = yg; 
+        placed = true;
+        break
+    end
+    position_accuracy = 0.05;   % keep your original tolerance
+
+% APF parameters
+zeta = 1.1547;
+eta = 0.0732;
+dstar = 0.3;
+Qstar = 0.75;
+
+% Parameters related to kinematic model
+error_theta_max = deg2rad(45);
+v_max = 0.2;
+Kp_omega = 1.5;
+omega_max = 0.5*pi; 
+
+% % Generate obstacles
+% obst1_points = [ linspace(5.5,5.5,100) linspace(5.5,7,100) linspace(7,7,100)    linspace(7,5.5,100) 
+%                  linspace(7,7,100)   linspace(5.5,5.5,100)   linspace(5.5,7,100)  linspace(7,7,100) ];
+% obst1_points(1,:) = obst1_points(1,:) - 1;
+% obst1_points(2,:) = obst1_points(2,:) - 1;
+% 
+% 
+% obst2_points = [ 2+sin(linspace(0,pi/2,100))     linspace(3,3,100)    linspace(3,2,100)           
+%                  2.5+cos(linspace(0,pi/2,100))   linspace(2.5,3.5,100)  linspace(3.5,3.5,100)    ];
+% obst2_points(2,:) = obst2_points(2,:) - 1.5;
+
+% --- Random obstacles that won't trap the start (x,y) on 0..10 grid ---
+% Requires x, y to be defined. If x_goal,y_goal exist, corridor points toward goal.
+
+% --- Random obstacles that won't trap the start (x,y) on 0..10 grid ---
+% Assumes x,y defined. If x_goal,y_goal exist, the free wedge points toward the goal.
+% Produces: obst1_points, obst2_points, obst3_points  (each 2xNpoints)
+
+% --- Defaults if missing (safe to keep) ---
+% === Random CLOSED-SHAPE obstacles that won’t trap start; no lines ===
+% Uses your existing variables: x, y, N, gs, r_clear, wedge_deg, R_keepout, theta_goal
+% Produces: obst1_points, obst2_points (closed C-shape), obst3_points  (each 2xM)
+
+if ~exist('x','var'), x = 5; end
+if ~exist('y','var'), y = 5; end
+if ~exist('gs','var'), gs = 10; end
+if ~exist('N','var'), N = 100; end
+if ~exist('r_clear','var'), r_clear = 0.1; end
+if ~exist('wedge_deg','var'), wedge_deg = 25; end
+if ~exist('R_keepout','var'), R_keepout = gs; end
+if ~exist('theta_goal','var')
+    if exist('x_goal','var') && exist('y_goal','var')
+        theta_goal = atan2(y_goal - y, x_goal - x);
+    else
+        theta_goal = 0;
+    end
+end
+wedge_rad = deg2rad(wedge_deg);
+
+rng('shuffle');
+
+% --- helpers (inline logic only, no functions) ---
+% reject if any vertex is in the start wedge (preserves closed shape)
+function_in_wedge = @(P) any( (abs(mod(atan2(P(2,:)-y, P(1,:)-x) - theta_goal + pi, 2*pi) - pi) <= wedge_rad) ...
+                              & (sqrt((P(1,:)-x).^2 + (P(2,:)-y).^2) <= R_keepout) );
+
+% fully inside bounds?
+function_all_in_bounds = @(P) all(P(1,:)>=0 & P(1,:)<=gs & P(2,:)>=0 & P(2,:)<=gs);
+
+% clearance from start and start not inside polygon
+function_clear_ok = @(P,isClosed) ( (~isClosed || ~inpolygon(x,y,P(1,:),P(2,:))) ...
+                                    && min(sqrt((P(1,:)-x).^2 + (P(2,:)-y).^2)) > r_clear );
+
+% ------------------ OBSTACLE 1: random rotated rectangle (CLOSED) -------------------
+tries = 0;
+while true
+    tries = tries + 1; if tries > 400, error('Could not place obst1'); end
+    cx = 1 + 8*rand;  cy = 1 + 8*rand;
+    w  = 0.8 + 1.6*rand;  h = 0.8 + 1.6*rand;    % ensure area > 0
+    th = 2*pi*rand;
+
+    C = [-w/2 -h/2;  w/2 -h/2;  w/2 h/2;  -w/2 h/2]';
+    Rz = [cos(th) -sin(th); sin(th) cos(th)];
+    V  = Rz*C + [cx; cy];
+
+    e1 = [linspace(V(1,1),V(1,2),N); linspace(V(2,1),V(2,2),N)];
+    e2 = [linspace(V(1,2),V(1,3),N); linspace(V(2,2),V(2,3),N)];
+    e3 = [linspace(V(1,3),V(1,4),N); linspace(V(2,3),V(2,4),N)];
+    e4 = [linspace(V(1,4),V(1,1),N); linspace(V(2,4),V(2,1),N)];
+    P  = [e1 e2 e3 e4];
+
+    if ~function_all_in_bounds(P), continue; end
+    if function_in_wedge(P), continue; end
+    if ~function_clear_ok(P,true), continue; end
+    obst1_points = P; break;
+end
+
+% --------------- OBSTACLE 2: CLOSED annular sector “C-shape” (not a line) ---------------
+tries = 0;
+while true
+    tries = tries + 1; if tries > 600, error('Could not place obst2'); end
+    cx = 1.5 + 7*rand; cy = 1.5 + 7*rand;
+    R2 = 1.2 + 1.8*rand;            % outer radius
+    tck = 0.35 + 0.45*rand;         % thickness
+    R1 = max(0.3, R2 - tck);        % inner radius < outer
+    phi = (randi(4)-1)*pi/2;        % orientation (0/90/180/270)
+    N_arc = N; N_rad = max(20, round(N*0.3));
+
+    t  = linspace(0, pi/2, N_arc);
+    % outer arc (local)
+    Ox = R2*cos(t);  Oy = R2*sin(t);
+    % inner arc (reverse)
+    Ix = R1*cos(fliplr(t));  Iy = R1*sin(fliplr(t));
+    % radial connectors at t=pi/2 and t=0
+    c1x = linspace(R2*cos(pi/2), R1*cos(pi/2), N_rad);  c1y = linspace(R2*sin(pi/2), R1*sin(pi/2), N_rad);
+    c0x = linspace(R1*cos(0),     R2*cos(0),     N_rad);  c0y = linspace(R1*sin(0),     R2*sin(0),     N_rad);
+
+    % concatenate closed ring sector
+    Px = [Ox  c1x  Ix  c0x];
+    Py = [Oy  c1y  Iy  c0y];
+
+    % rotate+translate
+    Rz = [cos(phi) -sin(phi); sin(phi) cos(phi)];
+    P2 = Rz * [Px; Py] + [cx; cy];
+
+    if ~function_all_in_bounds(P2), continue; end
+    if function_in_wedge(P2), continue; end
+    if ~function_clear_ok(P2,true), continue; end
+    obst2_points = P2; break;
+end
+
+% ------------------ OBSTACLE 3: another CLOSED rotated rectangle -------------------
+tries = 0;
+while true
+    tries = tries + 1; if tries > 400, error('Could not place obst3'); end
+    cx = 1 + 8*rand;  cy = 1 + 8*rand;
+    w  = 0.9 + 1.7*rand;  h = 0.9 + 1.7*rand;
+    th = 2*pi*rand;
+
+    C = [-w/2 -h/2;  w/2 -h/2;  w/2 h/2;  -w/2 h/2]';
+    Rz = [cos(th) -sin(th); sin(th) cos(th)];
+    V  = Rz*C + [cx; cy];
+
+    e1 = [linspace(V(1,1),V(1,2),N); linspace(V(2,1),V(2,2),N)];
+    e2 = [linspace(V(1,2),V(1,3),N); linspace(V(2,2),V(2,3),N)];
+    e3 = [linspace(V(1,3),V(1,4),N); linspace(V(2,3),V(2,4),N)];
+    e4 = [linspace(V(1,4),V(1,1),N); linspace(V(2,4),V(2,1),N)];
+    P3 = [e1 e2 e3 e4];
+
+    if ~function_all_in_bounds(P3), continue; end
+    if function_in_wedge(P3), continue; end
+    if ~function_clear_ok(P3,true), continue; end
+    obst3_points = P3; break;
+end
+
+m = 1; Nb = 400; gs = 10;
+border_points = [ linspace(m, gs-m, Nb)   linspace(gs-m, gs-m, Nb)  linspace(gs-m, m, Nb)   linspace(m, m, Nb) ;
+                  linspace(m, m, Nb)     linspace(m, gs-m, Nb)     linspace(gs-m, gs-m, Nb) linspace(gs-m, m, Nb) ];
+
+figure(1); 
+t = 1;
+dT = 0.1;
+t_max = 1000;
+X = zeros(1,t_max);
+Y = zeros(1,t_max);
+X(1) = x;
+Y(1) = y;
+
+% ========= Precompute 3D weighted surface of the total potential =========
+
+% Attractive potential (Khatib form), Repulsive potential (sum over obstacles)
+gx = linspace(0,gs,121); gy = linspace(0,gs,121);
+[GX,GY] = meshgrid(gx,gy);
+R = hypot(GX - x_goal, GY - y_goal);
+
+U_att = zeros(size(GX));
+mask_in  = R <= dstar;
+mask_out = R >  dstar;
+U_att(mask_in)  = 0.5 * zeta * (R(mask_in).^2);
+U_att(mask_out) = dstar*zeta*R(mask_out) - 0.5*zeta*dstar^2;
+
+Q = [GX(:) GY(:)];
+[~, d1] = dsearchn(obst1_points', Q);
+[~, d2] = dsearchn(obst2_points', Q);
+[~, d3] = dsearchn(border_points', Q);
+
+U_rep_vec = zeros(size(Q,1),1);
+% Each obstacle contributes when within Qstar
+for di = {d1, d2, d3}
+    dd = max(1e-6, di{1});              % avoid division by zero
+    msk = dd <= Qstar;
+    tmp = zeros(size(dd));
+    tmp(msk) = 0.5 * eta * ( (1./dd(msk) - 1/Qstar).^2 );
+    U_rep_vec = U_rep_vec + tmp;
+end
+U_rep = reshape(U_rep_vec, size(GX));
+U_tot = U_att + U_rep;
+
+% 3D figure scaffold (we'll update the path z as we go)
+figure(2); clf;
+surf(GX, GY, U_tot, 'EdgeColor', 'none'); 
+hold on; axis tight; 
+box on; 
+grid on;
+colormap parula; 
+colorbar;
+view(45,30);
+title('3D Weighted Potential Field with Path'); 
+xlabel('x'); 
+ylabel('y');
+zlabel('U(x,y)');
+
+% draw obstacles in 3D at a high z level
+Zwall = max(U_tot(:))*1.05;
+plot3(obst1_points(1,:), obst1_points(2,:), Zwall*ones(1,size(obst1_points,2)), 'r-', 'LineWidth', 2);
+plot3(obst2_points(1,:), obst2_points(2,:), Zwall*ones(1,size(obst2_points,2)), 'r-', 'LineWidth', 2);
+plot3(obst3_points(1,:), obst3_points(2,:), Zwall*ones(1,size(obst3_points,2)), 'r-', 'LineWidth', 2);
+plot3(border_points(1,:), border_points(2,:), Zwall*ones(1,size(border_points,2)), 'r-', 'LineWidth', 2);
+
+% path handle in 3D (start point)
+Zpath = interp2(GX, GY, U_tot, X(1), Y(1), 'linear', max(U_tot(:)));
+hPath3 = plot3(X(1), Y(1), Zpath, 'b-', 'LineWidth', 2);
+
+while norm([x_goal y_goal] - [x y]) > position_accuracy || t > t_max   
+    % Calculate Attractive Potential
+    if norm([x y]-[x_goal y_goal]) <= dstar
+        nablaU_att =  zeta*([x y]-[x_goal y_goal]);
+    else 
+        nablaU_att = dstar/norm([x y]-[x_goal y_goal]) * zeta*([x y]-[x_goal y_goal]);
+    end
+
+    % Find the minimum distance from the obstacle
+    [obst1_idx, obst1_dist] = dsearchn(obst1_points', [x y]);
+    [obst2_idx, obst2_dist] = dsearchn(obst2_points', [x y]);
+    [obst3_idx, obst3_dist] = dsearchn(obst3_points', [x y]);
+    [border_idx, border_dist] = dsearchn(border_points', [x y]);
+
+    % Calculate Repulsive Potential
+    nablaU_rep = [0 0];
+    if obst1_dist <= Qstar     
+        nablaU_rep = nablaU_rep + (eta*(1/Qstar - 1/obst1_dist) * 1/obst1_dist^2)*([x y] - [obst1_points(1,obst1_idx)  obst1_points(2,obst1_idx)]);
+    end
+    if obst2_dist <= Qstar  && ~inpolygon(x,y,obst2_points(1,:),obst2_points(2,:))          
+        nablaU_rep = nablaU_rep + (eta*(1/Qstar - 1/obst2_dist) * 1/obst2_dist^2)*([x y] - [obst2_points(1,obst2_idx)  obst2_points(2,obst2_idx)]);
+    end
+    if obst3_dist <= Qstar  && ~inpolygon(x,y,obst3_points(1,:),obst3_points(2,:))          
+        nablaU_rep = nablaU_rep + (eta*(1/Qstar - 1/obst3_dist) * 1/obst3_dist^2)*([x y] - [obst3_points(1,obst3_idx)  obst3_points(2,obst3_idx)]);
+    end
+    if border_dist <= Qstar
+         dd = max(border_dist, 1e-6);
+        nablaU_rep = nablaU_rep + (eta*(1/Qstar - 1/dd) * 1/dd^2)*([x y] - [border_points(1,border_idx)  border_points(2,border_idx)]);
+    end
+
+    % Final gradient
+
+    % Calculate final potential
+    nablaU = nablaU_att+nablaU_rep;
+
+    % Calculate reference value of linear velocity (v_ref) and orientation (theta_ref)
+    theta_ref = atan2(-nablaU(2), -nablaU(1));
+    error_theta = theta_ref - theta;
+    if abs(error_theta) <= error_theta_max
+        alpha = (error_theta_max - abs(error_theta)) / error_theta_max;
+        v_ref = min( alpha*norm(-nablaU), v_max );
+    else
+        v_ref = 0;
+    end
+    % Simple kinematic mobile robot model
+    % Omitted dynamics.
+    omega_ref = Kp_omega * error_theta;
+    omega_ref = min( max(omega_ref, -omega_max), omega_max);
+    theta = theta + omega_ref * dT;
+    x = x + v_ref*cos(theta) * dT;
+    y = y + v_ref*sin(theta) * dT;
+    t = t + 1;
+% Example: Download and display an image in MATLAB
+
+try
+    % URL of the image
+    imgURL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/640px-Fronalpstock_big.jpg';
+    
+    % Local filename to save the image
+    localFile = 'downloaded_image.jpg';
+    
+    % Download the image from the internet
+    websave(localFile, imgURL);
+    
+    % Read the image into MATLAB
+    imgData = imread(localFile);
+    
+    % Display the image in a figure
+    figure('Name', 'Downloaded Image', 'NumberTitle', 'off');
+    imshow(imgData);
+    title('Downloaded Image');
+    
+catch ME
+    % Error handling
+    fprintf('Error: %s\n', ME.message);
+    fprintf('Check your internet connection or the image URL.\n');
+end
+
+    % Archive and plot it
+    X(t) = x;
+    Y(t) = y;
+    cla;
+    daspect([1 1 1]); 
+    xlim([0 10]);  
+    ylim([0 10]);
+    box on; 
+    hold on;
+    grid on;
+    plot(obst1_points(1,:), obst1_points(2,:), '-r');
+    plot(obst2_points(1,:), obst2_points(2,:), '-r');
+    plot(obst3_points(1,:), obst3_points(2,:), '-r');
+    plot(border_points(1,:), border_points(2,:), '-r');
+    plot(x_goal, y_goal, 'ob');
+    plot(X(1:t), Y(1:t), '-b'); % Plot traveled path
+    plot([x x+0.2*cos(theta_ref)], [y y+0.2*sin(theta_ref)], '-g'); % Plot reference orientation of the robot
+    plot([x x+0.2*cos(theta)], [y y+0.2*sin(theta)], '-r'); % Plot orientation of the robot
+    drawnow; pause(dT);
+
+end
+
+t = t*dT; % scale from itetations to [s]
+disp("Travel time: " + t);
+
+% %% --- Stationary-robot mode: move obstacles/grid instead of the robot ---
+% STATIONARY_ROBOT = true;   % set false to go back to normal
+% 
+% % 1) Compute reference heading/velocities (unchanged)
+% theta_ref = atan2(-nablaU(2), -nablaU(1));
+% error_theta = theta_ref - theta;
+% 
+% if abs(error_theta) <= error_theta_max
+%     alpha = (error_theta_max - abs(error_theta)) / error_theta_max;
+%     v_ref = min( alpha*norm(-nablaU), v_max );
+% else
+%     v_ref = 0;
+% end
+% omega_ref = Kp_omega * error_theta;
+% omega_ref = min( max(omega_ref, -omega_max), omega_max);
+% 
+% % 2) Instead of moving the robot, move the WORLD by the opposite SE(2) motion
+% dtheta = omega_ref * dT;
+% theta  = theta + dtheta;   % keep controller state identical to normal mode
+% 
+% dx = v_ref * cos(theta) * dT;   % forward step in world frame (as if the robot had moved)
+% dy = v_ref * sin(theta) * dT;
+% 
+% if STATIONARY_ROBOT
+%     % Rigid transform for world points about the (x,y) robot position:
+%     %   P' = R(-dtheta) * (P - [x;y]) + [x;y]  -  [dx; dy]
+%     c = cos(-dtheta); s = sin(-dtheta);
+%     R2 = [c -s; s c];
+%     T  = [dx; dy];             % world moves by -T
+% 
+%     % Apply to every polyline that exists
+%     if exist('obst1_points','var') && ~isempty(obst1_points)
+%         Q = obst1_points - [x; y];       % shift to robot
+%         Q = R2 * Q;                      % rotate world
+%         Q = Q + [x; y] - T;              % shift back, translate opposite
+%         obst1_points = Q;
+%     end
+%     if exist('obst2_points','var') && ~isempty(obst2_points)
+%         Q = obst2_points - [x; y];
+%         Q = R2 * Q;
+%         Q = Q + [x; y] - T;
+%         obst2_points = Q;
+%     end
+%     if exist('obst3_points','var') && ~isempty(obst3_points)
+%         Q = obst3_points - [x; y];
+%         Q = R2 * Q;
+%         Q = Q + [x; y] - T;
+%         obst3_points = Q;
+%     end
+%     if exist('border_points','var') && ~isempty(border_points)
+%         Q = border_points - [x; y];
+%         Q = R2 * Q;
+%         Q = Q + [x; y] - T;
+%         border_points = Q;
+%     end
+% 
+%     % Move goal the same way so it appears to drift in the stationary robot frame
+%     if exist('x_goal','var') && exist('y_goal','var')
+%         g = [x_goal; y_goal] - [x; y];
+%         g = R2 * g;
+%         g = g + [x; y] - T;
+%         x_goal = g(1); y_goal = g(2);
+%     end
+% 
+%     % Robot stays fixed at (x,y); keep a flat path or log constant pose
+%     X(t) = x;  Y(t) = y;
+% 
+% else
+%     % --- ORIGINAL mobile-robot integration (fallback if you toggle off) ---
+%     x = x + dx;
+%     y = y + dy;
+%     X(t) = x;  Y(t) = y;
+% end
+% 
+% % 3) Plot (unchanged, but now obstacles/goal have moved)
+% cla; daspect([1 1 1]); xlim([0 10]); ylim([0 10]); box on; hold on; grid on;
+% if exist('obst1_points','var'), plot(obst1_points(1,:), obst1_points(2,:), '-r', 'LineWidth',2); end
+% if exist('obst2_points','var'), plot(obst2_points(1,:), obst2_points(2,:), '-r', 'LineWidth',2); end
+% if exist('obst3_points','var'), plot(obst3_points(1,:), obst3_points(2,:), '-r', 'LineWidth',2); end
+% if exist('border_points','var'), plot(border_points(1,:),  border_points(2,:),  '-r', 'LineWidth',2); end
+% plot(x_goal, y_goal, 'ob');
+% plot(X(1:t), Y(1:t), '-b');                               % path stays at the robot
+% plot([x x+0.2*cos(theta_ref)], [y y+0.2*sin(theta_ref)], '-g'); % ref orientation
+% plot([x x+0.2*cos(theta)],     [y y+0.2*sin(theta)],     '-r'); % robot heading (for control state)
+% drawnow; pause(dT);

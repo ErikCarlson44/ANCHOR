@@ -1,7 +1,33 @@
 clear; close all; clc;
+% Example: Download and display an image in MATLAB
+
+try
+    % % URL of the image
+    % imgURL = 'https://usa.fishermap.org/depth-map/mission-bay-san-diego-ca/';
+    % 
+    % % Local filename to save the image
+    % localFile = 'Martime map.jpg';
+    % 
+    % % Download the image from the internet
+    % websave(localFile, imgURL);
+    
+    % Read the image into MATLAB
+    imgData = imread('mission-bay-map.jpg');
+    
+    % Display the image in a figure
+    figure('map', 'Downloaded Image', 'NumberTitle', 'off');
+    imshow(imgData);
+    title('map');
+    
+catch ME
+    % Error handling
+    fprintf('Error: %s\n', ME.message);
+    fprintf('Check your internet connection or the image URL.\n');
+end
+
 % Initial position and orientation 
-x = 0.5;
-y = 0.5;
+x = 5;
+y = 5;
 theta = 0;
 % cut grid
 % Matlab C code generator
@@ -318,6 +344,7 @@ while norm([x_goal y_goal] - [x y]) > position_accuracy || t > t_max
     x = x + v_ref*cos(theta) * dT;
     y = y + v_ref*sin(theta) * dT;
     t = t + 1;
+
     % Archive and plot it
     X(t) = x;
     Y(t) = y;
