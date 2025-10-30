@@ -25,7 +25,7 @@ y_goal = margin + (GS - 2*margin)*rand;
 
 %% ---------------- APF parameters (scaled) ----------------
 zeta = 1.1547;              % attractive gain
-eta  = 0.1200;              % stronger repulsion to force detours
+eta  = 1.1247;              % stronger repulsion to force detours
 dstar = 0.03*GS;
 Qstar = 0.085*GS;           % thicker influence band
 
@@ -122,28 +122,28 @@ border_points=[ linspace(m, GS-m, Nb)   linspace(GS-m, GS-m, Nb)  linspace(GS-m,
 
 %% ---------------- Ensure the GOAL is valid ----------------
 % Not inside obstacles and at least 2% GS away from any obstacle/border
-min_goal_clear = 0.01*GS;
+min_goal_clear = GS;
 tries=0;
-while true
-    tries=tries+1; if tries>2000, error('Could not place a valid goal'); end
-    inside=false;
-    for j=1:numel(obs)
-        if inpolygon(x_goal,y_goal,obs{j}(1,:),obs{j}(2,:)), inside=true; break; end
-    end
-    if inside
-        x_goal = margin + (GS - 2*margin)*rand;
-        y_goal = margin + (GS - 2*margin)*rand;
-        continue;
-    end
-    dmin = inf;
-    for j=1:numel(obs)
-        [~, dj] = dsearchn(obs{j}', [x_goal y_goal]); dmin = min(dmin, dj);
-    end
-    [~, db] = dsearchn(border_points', [x_goal y_goal]); dmin = min(dmin, db);
-    if dmin >= min_goal_clear, break; end
+% while true
+%     tries=tries+1; if tries>2000, error('Could not place a valid goal'); end
+%     inside=false;
+%     for j=1:numel(obs)
+%         if inpolygon(x_goal,y_goal,obs{j}(1,:),obs{j}(2,:)), inside=true; break; end
+%     end
+%     if inside
+%         x_goal = margin + (GS - 2*margin)*rand;
+%         y_goal = margin + (GS - 2*margin)*rand;
+%         continue;
+%     end
+%     dmin = inf;
+%     for j=1:numel(obs)
+%         [~, dj] = dsearchn(obs{j}', [x_goal y_goal]); dmin = min(dmin, dj);
+%     end
+%     [~, db] = dsearchn(border_points', [x_goal y_goal]); dmin = min(dmin, db);
+%     if dmin >= min_goal_clear, break; end
     x_goal = margin + (GS - 2*margin)*rand;
     y_goal = margin + (GS - 2*margin)*rand;
-end
+% end
 
 %% ---------------- CUT-GRID occupancy (for black overlay + “mountain”) ----------------
 Nx=240; Ny=240;
@@ -349,7 +349,7 @@ while (hypot(x-x_goal,y-y_goal) > tol_goal) && (t < t_max)
     if entered
         % backtrack and push outward a small step along +g_rep (away from obstacle)
         x_new = x; y_new = y;
-        step_out = 0.004*GS * (g_rep / max(norm(g_rep),1e-9));
+        step_out = 10 * (g_rep / max(norm(g_rep),1e-9));
         x_new = x_new + step_out(1); y_new = y_new + step_out(2);
     end
 
