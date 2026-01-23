@@ -1,0 +1,309 @@
+.controls-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  flex: 1;
+}
+
+.controls-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Keyboard layout */
+.keyboard-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 100, 80, 0.2);
+}
+
+.key-row {
+  display: flex;
+  gap: 6px;
+}
+
+.key {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    180deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-primary) 100%
+  );
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.key.wide {
+  width: 120px;
+  font-size: 11px;
+}
+
+.key:hover {
+  border-color: var(--accent-tertiary);
+  color: var(--accent-secondary);
+}
+
+.key.active {
+  background: linear-gradient(
+    180deg,
+    var(--accent-tertiary) 0%,
+    rgba(0, 100, 80, 0.3) 100%
+  );
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* Control legend */
+.control-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  border: 1px solid rgba(0, 100, 80, 0.15);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-key {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  padding: 3px 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.legend-action {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Gauges */
+.gauges {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gauge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gauge-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+}
+
+.gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gauge.vertical .gauge-track {
+  height: 80px;
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gauge.horizontal .gauge-track {
+  height: 24px;
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gauge-fill {
+  position: absolute;
+  border-radius: 4px;
+  transition: all 0.1s ease;
+}
+
+.gauge-fill.throttle {
+  left: 4px;
+  right: 4px;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.gauge-fill.steering {
+  top: 4px;
+  bottom: 4px;
+  background: var(--accent-primary);
+  box-shadow: 0 0 10px var(--accent-primary);
+}
+
+.gauge-center-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.gauge-center-line.horizontal {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  height: 100%;
+}
+
+.gauge-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-align: center;
+}
+
+.gauge-indicators {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.gauge-indicators .gauge-value {
+  font-size: 11px;
+}
+
+/* Rudder display - binary positions */
+.rudder-display {
+  display: flex;
+  gap: 4px;
+}
+
+.rudder-position {
+  flex: 1;
+  padding: 10px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.rudder-position.center {
+  border-radius: 0;
+}
+
+.rudder-position.left {
+  border-radius: 6px 0 0 6px;
+}
+
+.rudder-position.right {
+  border-radius: 0 6px 6px 0;
+}
+
+.rudder-position.active {
+  background: rgba(0, 255, 204, 0.15);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 0 12px rgba(0, 255, 204, 0.3);
+}
+
+/* Throttle Limit Section */
+.throttle-limit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.throttle-limit-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.limit-btn {
+  flex: 1;
+  padding: 8px 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.limit-btn:hover {
+  border-color: var(--accent-tertiary);
+  color: var(--text-secondary);
+}
+
+.limit-btn.active {
+  background: rgba(0, 255, 204, 0.15);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.2);
+}
+
+/* Throttle limit line indicator */
+.throttle-limit-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
+  z-index: 2;
+}
+
+.limit-indicator {
+  font-size: 10px;
+  color: var(--text-muted);
+}

@@ -1,0 +1,89 @@
+:root {
+  /* Deep ocean color palette */
+  --bg-primary: #020a13;
+  --bg-secondary: #051525;
+  --bg-tertiary: #0a2035;
+  --bg-card: #0c1e2e;
+  
+  /* Accent colors - bioluminescent inspired */
+  --accent-primary: #00ffcc;
+  --accent-secondary: #00d4aa;
+  --accent-tertiary: #00aa88;
+  --accent-glow: rgba(0, 255, 204, 0.15);
+  
+  /* Warning/Danger colors */
+  --warning: #ffaa00;
+  --danger: #ff4466;
+  --success: #00ff88;
+  
+  /* Text colors */
+  --text-primary: #e0fff8;
+  --text-secondary: #80ccc0;
+  --text-muted: #406860;
+  
+  /* Borders */
+  --border-color: #1a4050;
+  --border-glow: #00ffcc40;
+  
+  /* Fonts */
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-display);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow: auto;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-tertiary);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-secondary);
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  background: var(--bg-primary) !important;
+  font-family: var(--font-mono);
+}
+
+.leaflet-control-zoom a {
+  background: var(--bg-card) !important;
+  color: var(--accent-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: var(--bg-tertiary) !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(5, 21, 37, 0.8) !important;
+  color: var(--text-muted) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--accent-tertiary) !important;
+}
+
