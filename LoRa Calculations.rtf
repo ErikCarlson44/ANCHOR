@@ -1,0 +1,63 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2818
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww21920\viewh14280\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 LoRa Tx Notes\
+\
+Goals -> Increase payload, Decrease time of transmission\
+\
+\
+- Theoretically Class C would have the fastest transmission. This comes at the cost of SNR, bit error, and distance.\
+  Class A would have the slowest transmission but lowest power consumption.\
+  Class B is a good middle ground; low power consumption and high SNR, but not at the expense of each other.\
+\
+\
+Deriving a Theoretical Maximum for R,b (Nominal Bit Rate):\
+\
+	R,b = SF * R,code * BW/(2^SF)\
+\
+		To maximize R,b -> increase BW, increase R,code and decrease SF (Spreading Factor)\
+\
+	From LoRa Protocol: BW has options of 125 kHz or 500 kHz in the United States, however there isn\'92t a lot of documentation on the 500 kHz bandwidth.\
+				  	For these calculations we will use BW = 125 kHz. This will be seen in better detail when we get to payload.\
+			 	  R,code = 4/5, 4/6, 4/7, 4/8 in the United States. We use 4/5\
+			  	  SF = 7, 8, 9, 10, 11, 12. We use 7\
+\
+	R,b,max = 7 * 4/5 * (125 kHz)/(2^7) = 5.469 kbps\
+\
+Deriving Time of Packet (seconds):\
+\
+	T,packet = T,preamble + T,payload = Ts * [(N,pp + 4.25) + (8 + ceil((8*PL - 4*SF + 28 +16*CRC - 20*IH)*(CR + 4)/(4*(SF - 2*DE)))]\
+\
+	Established:\
+		SF = 7\
+		BW = 125 kHz\
+\
+	Derived:\
+		PL = PL,max = 242 bytes -> maximum payload for SF = 7, BW = 125 kHz. No information given at 500 kHz bandwidth\
+		CRC = 1 (enable message)\
+		DE = 0 (for Class B)\
+		IH = 0\
+		\
+		CR = 1\
+			-> This comes from R,code = k/(k+CR), where k is the number of encoded bits and CR is the number of redundant bits (also called Coding Rate).\
+			    With k = 4 and CR = 1, we get Recode = 4/5\
+\
+		N,pp = 8\
+			-> Fixed value in LoRaWAN protocol\
+\
+		Ts = 2^SF/BW = 2^7/(125 kHz) = 1.024 ms\
+\
+	Calculation:\
+		T,packet = 0.379 s = 379 ms\
+\
+\
+\
+Notes:\
+	- Theoretically we could increase BW to 500 kHz, but I am not aware of the maximum payload at this bandwidth. It would not be worth it if PL is less than what it currently is\
+	- SNR needs to be maintained above 20 dB ideally. LoRa does have If increasing the BW to 500 kHz, SNR could become an issue.\
+	  	Thankfully LoRaWAN compensates for low SNRs as long as they are above the noise power floor level.\
+	- LoRa implements chirp spreading automatically. This would be incredibly difficult to calculate, but it should improve SNR and bit rate if used.}
