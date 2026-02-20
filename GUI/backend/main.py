@@ -42,11 +42,12 @@ class LoraHandler:
     def __init__(self):
         self.serial_connection: Optional[serial.Serial] = None
         self.simulation_mode = True
+        self.boat_connected = False  # True when boat responds to ping
         self.connected_clients: Set[WebSocket] = set()
         
-        # Simulation state
-        self._sim_lat = 29.7604
-        self._sim_lon = -95.3698
+        # Simulation state - Mission Bay, San Diego
+        self._sim_lat = 32.7872
+        self._sim_lon = -117.2350
         self._sim_heading = 45.0
         self._sim_speed = 0.0
         self._sim_throttle = 0.0
@@ -58,13 +59,58 @@ class LoraHandler:
         ports = serial.tools.list_ports.comports()
         return [port.device for port in ports]
     
-    def connect(self, port: str, baudrate: int = 9600) -> bool:
-        """Connect to LORA module."""
+    def connect(self, port: str, baudrate: int = 115200) -> bool:
+        """Connect to LORA module (serial port only, not boat)."""
         try:
+            if self.serial_connection:
+                self.serial_connection.close()
             self.serial_connection = serial.Serial(port, baudrate, timeout=1)
-            self.simulation_mode = False
+            # Don't set simulation_mode=False yet - wait for boat handshake
             return True
-        except serial.SerialException:
+        except serial.SerialException as e:
+            print(f"Serial connection failed: {e}")
+            return False
+    
+    def ping_boat(self, timeout: float = 3.0) -> bool:
+        """
+        Send ping to boat and wait for response.
+        Returns True if boat responds, False otherwise.
+        """
+        if not self.serial_connection or not self.serial_connection.is_open:
+            return False
+        
+        try:
+            # Clear any pending data
+            self.serial_connection.reset_input_buffer()
+            
+            # Send ping message
+            ping_msg = json.dumps({"type": "ping"}) + '\n'
+            self.serial_connection.write(ping_msg.encode())
+            print(f"Sent ping to boat...")
+            
+            # Wait for response with timeout
+            start_time = time.time()
+            while (time.time() - start_time) < timeout:
+                if self.serial_connection.in_waiting > 0:
+                    try:
+                        line = self.serial_connection.readline().decode().strip()
+                        if line:
+                            data = json.loads(line)
+                            # Check for pong response or telemetry (either means boat is alive)
+                            if data.get('type') == 'pong' or 'lat' in data:
+                                print(f"Boat responded!")
+                                self.boat_connected = True
+                                self.simulation_mode = False
+                                return True
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        pass  # Keep waiting
+                time.sleep(0.05)
+            
+            print(f"Boat did not respond within {timeout}s")
+            return False
+            
+        except serial.SerialException as e:
+            print(f"Ping failed: {e}")
             return False
     
     def disconnect(self):
@@ -73,6 +119,7 @@ class LoraHandler:
             self.serial_connection.close()
             self.serial_connection = None
         self.simulation_mode = True
+        self.boat_connected = False
     
     def send_command(self, command: ControlCommand):
         """Send control command to boat."""
@@ -211,16 +258,79 @@ async def get_ports():
 
 @app.post("/connect/{port}")
 async def connect_port(port: str):
-    """Connect to a COM port."""
+    """
+    Connect to a COM port and attempt handshake with boat.
+    Returns immediately after opening serial port.
+    Use /handshake endpoint to perform the actual boat connection.
+    """
     success = lora.connect(port)
-    return {"success": success, "simulation": lora.simulation_mode}
+    return {
+        "success": success, 
+        "simulation": lora.simulation_mode,
+        "boat_connected": lora.boat_connected
+    }
+
+
+@app.post("/quickconnect/{port}")
+async def quick_connect_port(port: str):
+    """
+    Quick connect - skips handshake, immediately switches to live mode.
+    Use this for testing when boat handshake isn't working.
+    """
+    success = lora.connect(port)
+    if success:
+        lora.simulation_mode = False
+        lora.boat_connected = True
+    return {
+        "success": success,
+        "simulation": lora.simulation_mode,
+        "boat_connected": lora.boat_connected
+    }
+
+
+@app.post("/handshake")
+async def handshake_boat():
+    """
+    Perform handshake with boat - sends ping and waits for response.
+    This is a blocking call that waits up to 3 seconds for boat response.
+    """
+    if not lora.serial_connection:
+        return {
+            "success": False,
+            "error": "No serial connection",
+            "simulation": True,
+            "boat_connected": False
+        }
+    
+    # Run ping in thread to not block event loop
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future = executor.submit(lora.ping_boat, 3.0)
+        boat_responded = future.result()
+    
+    return {
+        "success": boat_responded,
+        "simulation": lora.simulation_mode,
+        "boat_connected": lora.boat_connected,
+        "error": None if boat_responded else "Boat did not respond"
+    }
+
+
+@app.get("/status")
+async def get_status():
+    """Get current connection status."""
+    return {
+        "simulation": lora.simulation_mode,
+        "boat_connected": lora.boat_connected,
+        "serial_open": lora.serial_connection is not None and lora.serial_connection.is_open
+    }
 
 
 @app.post("/disconnect")
 async def disconnect_port():
     """Disconnect from current port."""
     lora.disconnect()
-    return {"success": True, "simulation": True}
+    return {"success": True, "simulation": True, "boat_connected": False}
 
 
 @app.post("/command")

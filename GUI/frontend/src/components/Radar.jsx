@@ -7,7 +7,7 @@ function Radar({ heading, obstacles }) {
   const blipsRef = useRef([])
   const animationRef = useRef(null)
   
-  const [maxRange, setMaxRange] = useState(50) // meters
+  const [maxRange, setMaxRange] = useState(4) // meters (0.5m to 8m for RD-03D)
   
   useEffect(() => {
     const canvas = canvasRef.current
@@ -159,30 +159,25 @@ function Radar({ heading, obstacles }) {
     }
     
     const updateBlips = () => {
-      const sweepAngle = sweepAngleRef.current
-      
+      // Always add current obstacles as blips (don't wait for sweep)
       obstacles.forEach(obs => {
-        // Convert obstacle angle to sweep coordinate
-        const obsAngle = (obs.angle + 360) % 360
-        const diff = Math.abs(sweepAngle - obsAngle)
+        const angleRad = (obs.angle - 90) * (Math.PI / 180)
+        const normDist = Math.min(obs.distance / maxRange, 1)
         
-        if (diff < 10 || diff > 350) {
-          // In sweep area - add blip
-          const angleRad = (obs.angle - 90) * (Math.PI / 180)
-          const normDist = Math.min(obs.distance / maxRange, 1)
-          
+        // Only show if within range
+        if (normDist > 0 && normDist <= 1) {
           const x = normDist * Math.cos(angleRad)
           const y = normDist * Math.sin(angleRad)
           
           // Check if blip already exists at this position
           const exists = blipsRef.current.some(
-            b => Math.abs(b.x - x) < 0.05 && Math.abs(b.y - y) < 0.05 && b.age > 0.8
+            b => Math.abs(b.x - x) < 0.08 && Math.abs(b.y - y) < 0.08 && b.age > 0.5
           )
           
           if (!exists) {
             blipsRef.current.push({
               x, y,
-              size: obs.size,
+              size: obs.size || 1,
               age: 1
             })
           }
@@ -277,14 +272,14 @@ function Radar({ heading, obstacles }) {
         <div className="range-controls">
           <button 
             className="range-btn"
-            onClick={() => setMaxRange(Math.max(25, maxRange - 25))}
+            onClick={() => setMaxRange(Math.max(0.5, maxRange - 0.5))}
           >
             −
           </button>
           <span className="range-display">{maxRange}m</span>
           <button 
             className="range-btn"
-            onClick={() => setMaxRange(Math.min(200, maxRange + 25))}
+            onClick={() => setMaxRange(Math.min(8, maxRange + 0.5))}
           >
             +
           </button>

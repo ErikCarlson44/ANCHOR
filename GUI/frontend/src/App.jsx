@@ -10,8 +10,8 @@ import './App.css'
 
 function App() {
   const [telemetry, setTelemetry] = useState({
-    latitude: 29.7604,
-    longitude: -95.3698,
+    latitude: 32.7872,
+    longitude: -117.2350,
     heading: 0,
     speed: 0,
     battery: 100,
