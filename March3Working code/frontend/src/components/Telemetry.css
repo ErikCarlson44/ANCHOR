@@ -1,0 +1,265 @@
+.telemetry-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary),
+    var(--bg-secondary)
+  );
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panel-icon {
+  color: var(--accent-primary);
+  font-size: 16px;
+  filter: drop-shadow(0 0 6px var(--accent-primary));
+}
+
+.panel-header h2 {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--accent-secondary);
+  margin: 0;
+}
+
+.telemetry-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.telemetry-section {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(0, 100, 80, 0.2);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+/* GPS Grid */
+.gps-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.data-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.data-key {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.data-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+
+/* Navigation */
+.nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.data-item.large {
+  text-align: center;
+}
+
+.heading-display,
+.speed-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.heading-value,
+.speed-value {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  text-shadow: 0 0 20px var(--accent-glow);
+}
+
+.heading-unit,
+.speed-unit {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.compass-indicator {
+  margin-left: 8px;
+}
+
+.compass-direction {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-secondary);
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+/* Battery */
+.battery-display {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.battery-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.battery-icon {
+  font-size: 14px;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.battery-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.battery-percent {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.battery-bar-container {
+  position: relative;
+  height: 16px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.battery-bar {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  bottom: 2px;
+  border-radius: 6px;
+  box-shadow: 0 0 10px currentColor;
+  transition: background 0.3s;
+}
+
+.battery-segments {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+}
+
+.segment {
+  flex: 1;
+  border-right: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.segment:last-child {
+  border-right: none;
+}
+
+/* Obstacle display */
+.obstacle-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.obstacle-count {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.obstacle-number {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--danger);
+  text-shadow: 0 0 15px rgba(255, 68, 102, 0.4);
+  line-height: 1;
+}
+
+.obstacle-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.radar-status-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.radar-sweep {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 50%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent-primary), transparent);
+  transform-origin: left center;
+  animation: sweep 2s linear infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
