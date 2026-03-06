@@ -1,22 +1,33 @@
 """
-GPS Module - Parses NMEA data from GPS receiver
-Import this module and create a GPSReader instance.
+=============================================================================
+GPS TEST - GY-GPSV3 NEO-M8N on Raspberry Pi Pico
+=============================================================================
+Test script for GPS module with NMEA parsing.
+
+Wiring:
+  GPS TX  -> GP0 (Pico RX)
+  GPS RX  -> GP1 (Pico TX)
+  GPS VCC -> 3.3V
+  GPS GND -> GND
+
+=============================================================================
 """
 
 import time
 import board
 import busio
 
-# -----------------------------
-# Configuration - CHANGE THESE
-# -----------------------------
-GPS_TX_PIN = board.GP4   # Pico RX <- GPS TX
-GPS_RX_PIN = board.GP5   # Pico TX -> GPS RX  
-GPS_BAUDRATE = 9600
+# =============================================================================
+# CONFIGURATION - GY-GPSV3 NEO-M8N on Pico GP4/GP5
+# =============================================================================
+# Using GP4/GP5 to avoid conflict with radar (which uses GP0/GP1)
+GPS_TX_PIN = board.GP4   # Pico TX -> GPS RX
+GPS_RX_PIN = board.GP5   # Pico RX <- GPS TX
+GPS_BAUDRATE = 9600      # NEO-M8N default
 
-# -----------------------------
-# Helper Functions
-# -----------------------------
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
 def nmea_deg_to_decimal(raw, hemi):
     """Convert NMEA format (DDMM.MMMM) to decimal degrees."""
     if not raw:
@@ -53,9 +64,9 @@ def parse_rmc(s):
     heading = float(p[8]) if p[8] else 0.0
     return status, lat, lon, spd_knots, heading
 
-# -----------------------------
-# GPS Reader Class
-# -----------------------------
+# =============================================================================
+# GPS READER CLASS
+# =============================================================================
 class GPSReader:
     """
     Reads and parses GPS NMEA data.
@@ -80,7 +91,7 @@ class GPSReader:
         self.fix_quality = 0
         self.has_fix = False
         
-        print("GPS: Initialized")
+        print("GPS: Initialized (GP4/GP5, %d baud)" % baudrate)
     
     def update(self):
         """Read and parse any available GPS data. Call this frequently."""
@@ -142,11 +153,25 @@ class GPSReader:
         }
 
 
-# -----------------------------
-# Standalone Test
-# -----------------------------
-if __name__ == "__main__":
-    print("GPS Test Mode")
+# =============================================================================
+# MAIN TEST
+# =============================================================================
+def main():
+    print("=" * 50)
+    print("GPS TEST - GY-GPSV3 NEO-M8N")
+    print("=" * 50)
+    print()
+    print("Wiring:")
+    print("  GPS TX  -> GP5 (Pico RX)")
+    print("  GPS RX  -> GP4 (Pico TX)")
+    print("  GPS VCC -> 3.3V")
+    print("  GPS GND -> GND")
+    print()
+    print("Waiting for GPS fix...")
+    print("(May take 30-60 seconds outdoors)")
+    print()
+    print("=" * 50)
+    
     gps = GPSReader()
     
     while True:
@@ -154,9 +179,16 @@ if __name__ == "__main__":
         data = gps.get_data()
         
         if data["fix"] and data["lat"] is not None:
-            print("FIX lat=%.6f lon=%.6f hdg=%.1f spd=%.1f sats=%s" % (
-                data["lat"], data["lon"], data["hdg"], data["spd"], data["sats"]))
+            print("FIX | Lat: %.6f | Lon: %.6f | Spd: %.1f kts | Hdg: %.1f° | Sats: %s" % (
+                data["lat"], data["lon"], data["spd"], data["hdg"], data["sats"]))
         else:
-            print("NO FIX")
+            print("NO FIX | Sats: %s | Searching..." % data["sats"])
         
         time.sleep(1)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nStopped")
