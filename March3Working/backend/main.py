@@ -225,7 +225,7 @@ class LoraHandler:
                                 self.boat_connected = True
                                 self.simulation_mode = False
                                 return True
-                    except (json.JSONDecodeError, UnicodeDecodeError):
+                    except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
                         pass
                 time.sleep(0.05)
             print(f"Boat did not respond within {timeout}s")
@@ -460,16 +460,19 @@ class LoraHandler:
         try:
             if self.serial_connection.in_waiting > 0:
                 line = self.serial_connection.readline().decode().strip()
-                # Skip non-telemetry messages (like pong)
-                if not line.startswith('{') or '"type"' in line:
+                if not line.startswith("{"):
                     if self._last_live_telemetry:
                         return self._last_live_telemetry
                     return self._generate_empty_telemetry()
-                
-                data = json.loads(line)
-                
-                # Only process actual telemetry (has 'lat' field)
-                if 'lat' not in data:
+                try:
+                    data = json.loads(line)
+                except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
+                    if self._last_live_telemetry:
+                        return self._last_live_telemetry
+                    return self._generate_empty_telemetry()
+
+                if not isinstance(data, dict) or "lat" not in data:
+                    # ping/pong/status/control — keep last map telemetry
                     if self._last_live_telemetry:
                         return self._last_live_telemetry
                     return self._generate_empty_telemetry()
@@ -503,7 +506,12 @@ class LoraHandler:
                 )
                 self._last_live_telemetry = telemetry
                 return telemetry
-        except (json.JSONDecodeError, serial.SerialException, UnicodeDecodeError):
+        except (
+            json.JSONDecodeError,
+            ValueError,
+            serial.SerialException,
+            UnicodeDecodeError,
+        ):
             pass
         except Exception:
             pass
@@ -511,7 +519,7 @@ class LoraHandler:
         # No new data - return last known telemetry (not simulation!)
         if self._last_live_telemetry:
             return self._last_live_telemetry
-        
+
         return self._generate_empty_telemetry()
     
     def _generate_empty_telemetry(self) -> BoatTelemetry:

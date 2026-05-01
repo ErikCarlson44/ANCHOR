@@ -85,7 +85,10 @@ import math
 import json
 import supervisor
 import sys
-import i2ctarget
+try:
+    import i2ctarget
+except ImportError:
+    i2ctarget = None
 
 # =============================================================================
 # CONFIGURATION
@@ -93,7 +96,10 @@ import i2ctarget
 
 # Boat layout: "combined" = one Pico (GPS/radar/IMU/motors + LoRa on same board).
 # "sensor" = sensor/motor Pico only; LoRa RFM9x on a second Pico linked by UART.
-BOAT_MODE = "sensor"  # "combined" | "sensor"
+# Dedicated USB-direct build for sensor Pico:
+# - no LoRa radio
+# - no inter-Pico bridge
+BOAT_MODE = "combined"  # "combined" | "sensor"
 
 # Inter-Pico link (I2C, only used when BOAT_MODE == "sensor")
 # Sensor Pico runs as I2C target; LoRa Pico acts as I2C controller.
@@ -131,9 +137,7 @@ TELEMETRY_RATE_HZ = 10
 # -----------------------------------------------------------------------------
 # LoRa RFM95W (SPI) — raw packet TX/RX (must match partner radio settings)
 # -----------------------------------------------------------------------------
-LORA_ENABLED = True
-if BOAT_MODE == "sensor":
-    LORA_ENABLED = False
+LORA_ENABLED = False
 if LORA_ENABLED:
     LORA_SPI_SCK = board.GP18
     LORA_SPI_MOSI = board.GP19
@@ -151,7 +155,7 @@ LORA_FREQ_MHZ = 915.0
 LORA_SEND_EVERY_N = 1       # keep every-frame eligibility, actual rate set by interval below
 LORA_MIN_TX_INTERVAL_S = 1.0  # practical SF11 cap to prevent blocking radar/IMU loop
 LORA_RX_TIMEOUT_S = 0.0     # non-blocking receive poll
-LORA_RX_COMMANDS_ENABLED = True   # enable air control packets for LoRa throttle/rudder
+LORA_RX_COMMANDS_ENABLED = False  # USB-only build: no air command polling
 LORA_MAX_PACKET = 200     # bytes (LoRa MTU ~255; keep JSON small)
 # 11-byte binary uplink/downlink (see anchor_lora_compact.py on CIRCUITPY)
 try:
@@ -1043,6 +1047,10 @@ def main():
         if not isinstance(cmd, dict):
             return
         cmd_type = cmd.get("type", "")
+        # Backward/alternate GUI compatibility:
+        # if a payload has control fields but no "type", treat it as control.
+        if not cmd_type and any(k in cmd for k in ("throttle", "throttla", "steering", "rudder")):
+            cmd_type = "control"
         if cmd_type == "ping":
             emit_usb_json({"type": "pong"})
             if lora and LORA_COMPACT:
@@ -1071,21 +1079,20 @@ def main():
         elif cmd_type == "control":
             # Throttle ignored until ESC arm window; steering may still update (ESC stays neutral via force_neutral)
             t = cmd.get("throttle")
+            if t is None:
+                t = cmd.get("throttla")
             s = cmd.get("steering")
+            if s is None:
+                s = cmd.get("rudder")
             armed = time.monotonic() >= esc_arm_until_mono
             use_usb_throttle = USB_GUI_CONTROL or THROTTLE_SOURCE == "serial"
             if use_usb_throttle and armed:
                 nv = parse_throttle_01(t)
                 if nv is not None:
                     gui_throttle = nv
-                    # LoRa/USB "stop" sets paused=True; any new control should resume motion.
-                    if nv > 0.0:
-                        paused = False
             ns = parse_steering_pm1(s)
             if ns is not None:
                 gui_steering = ns
-                if ns != 0.0:
-                    paused = False
 
     USB_CMD_BUF_MAX = 512
     inter_pico_cmd_buffer = ""

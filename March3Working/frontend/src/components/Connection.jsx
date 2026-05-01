@@ -12,9 +12,14 @@ const STATE = {
 // Serial baud for LoRa USB bridge — must match firmware on the bridge radio
 const BAUD_OPTIONS = [4800, 9600, 19200, 38400, 57600, 115200]
 
-// json = Pico USB / JSON; mdot = MultiTech mDot AT (Micro UDK)
+// json = CircuitPython Pico on USB (newline JSON). Same mode for: boat plugged in directly,
+// OR ground Pico running lora_ground_bridge_code.py (LoRa to boat — PC never sees RF).
+// mdot = MultiTech mDot AT (Micro UDK)
 const MODEM_OPTIONS = [
-  { value: 'json', label: 'Pico / JSON (USB telemetry)' },
+  {
+    value: 'json',
+    label: 'Pico / JSON (boat USB or ground LoRa bridge)',
+  },
   { value: 'mdot', label: 'mDot MTDOT-915 (Micro UDK, AT)' },
 ]
 
@@ -228,7 +233,7 @@ function Connection({ connected, simulation, onConnect, onDisconnect }) {
 
         {/* Port selection */}
         <div className="port-section">
-          <label className="port-label">LORA PORT</label>
+          <label className="port-label">USB SERIAL PORT</label>
           <div className="port-row">
             <select 
               className="port-select"
@@ -348,7 +353,12 @@ function Connection({ connected, simulation, onConnect, onDisconnect }) {
         <div className="connection-help">
           {isSimulation && (
             <p>
-              Choose <strong>Pico / JSON</strong> for USB telemetry from the boat, or <strong>mDot</strong> for MultiTech MTDOT-915 on Micro UDK (handshake = AT → OK). Set baud to match the UDK (often 115200).
+              <strong>No separate “LoRa” switch:</strong> the PC always uses USB serial. For{' '}
+              <strong>LoRa</strong>, plug in the <strong>ground Pico</strong> (bridge firmware) and
+              pick its COM port; for <strong>direct boat USB</strong>, plug in the boat Pico instead.
+              Use <strong>Pico / JSON</strong> for both (not mDot). Baud is usually{' '}
+              <strong>115200</strong> for CircuitPython. Or choose <strong>mDot</strong> for Micro UDK
+              (AT handshake).
             </p>
           )}
           {isConnecting && (
